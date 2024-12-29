@@ -1,4 +1,62 @@
 ```
+Cách 1: Theo dõi thay đổi từ props.data bằng watch
+Sử dụng watch để cập nhật registData mỗi khi props.data thay đổi.
+
+Cập nhật script:
+
+ts
+Sao chép mã
+const registData = ref({ ...props.data });
+
+watch(
+  () => props.data,
+  (newValue) => {
+    registData.value = { ...newValue };
+  },
+  { immediate: true }
+);
+Cách 2: Sử dụng trực tiếp props.data
+Nếu không cần chỉnh sửa dữ liệu trong component con, bạn có thể dùng props.data trực tiếp.
+
+Cập nhật template:
+
+vue
+Sao chép mã
+<MTextField
+  v-model="props.data[field.name]" <!-- Dùng trực tiếp props.data -->
+  :label="field.label"
+  :placeholder="field.placeholder"
+  :error-message="touched[field.name] ? errors[field.name] : undefined"
+  @blur="validateField(field.name)"
+/>
+Cách 3: Thay thế v-model bằng @input và sử dụng hai chiều
+Nếu bạn cần cập nhật dữ liệu từ component con, emit sự kiện update:data để thông báo lên component cha.
+
+Cập nhật script:
+
+ts
+Sao chép mã
+const updateField = (name: string, value: string) => {
+  registData.value[name] = value;
+  emits('update:data', registData.value);
+};
+Cập nhật template:
+
+vue
+Sao chép mã
+<MTextField
+  :value="registData[field.name]"
+  @input="value => updateField(field.name, value)"
+  :label="field.label"
+  :placeholder="field.placeholder"
+  :error-message="touched[field.name] ? errors[field.name] : undefined"
+  @blur="validateField(field.name)"
+/>
+Kết luận
+Nếu chỉ cần hiển thị: Cách 2 là đơn giản nhất.
+Nếu cần chỉnh sửa dữ liệu: Cách 1 hoặc Cách 3 giúp đảm bảo dữ liệu đồng bộ giữa component cha và con.
+```
+```
 dieu chinh viet vo la hien thi luon
 <script setup lang="ts">
 import * as yup from "yup";
