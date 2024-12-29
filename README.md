@@ -1,4 +1,367 @@
 ```
+dieu chinh viet vo la hien thi luon
+<script setup lang="ts">
+import * as yup from "yup";
+import MTextField from "~/components/mocules/MTextField/index.vue";
+import { ref, reactive } from "vue";
+
+type RegistData = Record<string, string>;
+
+interface Field {
+  name: string;
+  label: string;
+  placeholder: string;
+  validation: yup.StringSchema<string>;
+}
+
+const emits = defineEmits<{
+  (e: "regist"): void;
+}>();
+
+interface Props {
+  fields: Field[];
+  registData: RegistData;
+}
+
+class RegistController {
+  public fields: Field[];
+  public props;
+  public registData: Ref<RegistData>;
+  public errors = reactive<Record<string, string>>({});
+  public touched = reactive<Record<string, boolean>>({}); // Thêm trạng thái `touched`
+
+  constructor(props: Props) {
+    this.fields = props.fields;
+    this.props = props;
+    this.registData = ref<RegistData>({ ...this.props.registData });
+    this.resetErrors();
+
+    // Ràng buộc các phương thức
+    this.validateAll = this.validateAll.bind(this);
+    this.regist = this.regist.bind(this);
+  }
+
+  async validateField(name: string) {
+    const field = this.fields.find((f) => f.name === name);
+    if (!field) return;
+    this.touched[name] = true; // Đánh dấu trường đã bị "touch"
+    try {
+      await field.validation.validate(this.registData.value[name]);
+      this.errors[name] = "";
+    } catch (error: any) {
+      this.errors[name] = error.message;
+    }
+  }
+
+  async validateAll() {
+    this.fields.forEach((field) => (this.touched[field.name] = true)); // Đánh dấu tất cả trường đã "touch"
+    await Promise.all(this.fields.map((field) => this.validateField(field.name)));
+    return Object.values(this.errors).every((error) => !error);
+  }
+
+  resetErrors() {
+    this.fields.forEach((field) => {
+      this.errors[field.name] = "";
+      this.touched[field.name] = false; // Đặt lại `touched`
+    });
+  }
+
+  async regist() {
+    if (await this.validateAll()) {
+      console.log("Data:", this.registData.value);
+      emits("regist");
+    } else {
+      console.warn("Validation failed");
+    }
+  }
+}
+
+const props = defineProps<Props>();
+const controller = new RegistController(props);
+
+const { fields, registData, errors, validateField, touched, regist } = controller;
+</script>
+
+<template>
+  <v-row>
+    <v-col cols="12" md="6" v-for="field in fields" :key="field.name">
+      <MTextField
+        v-model="registData[field.name]"
+        :label="field.label"
+        :placeholder="field.placeholder"
+        :error-message="touched[field.name] ? errors[field.name] : undefined"
+        @blur="validateField(field.name)"
+      />
+    </v-col>
+    <v-col cols="12" md="6">
+      <v-btn @click="regist">Regist</v-btn>
+    </v-col>
+  </v-row>
+</template>
+
+```
+```
+parent
+<template>
+  <v-container>
+    <v-btn @click="openUpdateForm(user)">Edit User</v-btn>
+
+    <UpdateForm
+      v-if="showForm"
+      :data="selectedData"
+      :fields="fields"
+      @update="handleUpdate"
+      @cancel="closeForm"
+    />
+  </v-container>
+</template>
+
+<script setup lang="ts">
+import { ref } from "vue";
+import UpdateForm from "@/components/UpdateForm.vue";
+
+const user = {
+  firstName: "John",
+  lastName: "Doe",
+  email: "john.doe@example.com",
+  address: "123 Main Street",
+};
+
+const fields = [
+  { name: "firstName", label: "First Name", type: "text", placeholder: "Enter First Name" },
+  { name: "lastName", label: "Last Name", type: "text", placeholder: "Enter Last Name" },
+  { name: "email", label: "Email", type: "email", placeholder: "Enter Email" },
+  { name: "address", label: "Address", type: "text", placeholder: "Enter Address" },
+];
+
+const showForm = ref(false);
+const selectedData = ref<Record<string, any>>({});
+
+const openUpdateForm = (data: Record<string, any>) => {
+  selectedData.value = { ...data }; // Truyền dữ liệu người dùng vào form
+  showForm.value = true;
+};
+
+const closeForm = () => {
+  showForm.value = false;
+};
+
+const handleUpdate = (updatedData: Record<string, any>) => {
+  console.log("Updated Data:", updatedData); // Dữ liệu sau khi cập nhật
+  closeForm();
+};
+</script>
+
+```
+```
+<script setup lang="ts">
+import { reactive, watch } from "vue";
+import MTextField from "@/components/mocules/MTextField/index.vue";
+
+interface Field {
+  name: string;
+  label: string;
+  type: string;
+  placeholder?: string;
+}
+
+interface Props {
+  data: Record<string, any>; // Dữ liệu được truyền vào
+  fields: Field[]; // Cấu hình các trường
+}
+
+const props = defineProps<Props>();
+const emits = defineEmits<{
+  (e: "update", updatedData: Record<string, any>): void;
+  (e: "cancel"): void;
+}>();
+
+// Sao chép dữ liệu từ props.data vào formData để quản lý
+const formData = reactive({ ...props.data });
+
+watch(
+  () => props.data,
+  (newData) => {
+    Object.assign(formData, newData); // Đồng bộ dữ liệu khi props.data thay đổi
+  }
+);
+
+const onUpdate = () => {
+  emits("update", formData); // Emit dữ liệu khi nhấn update
+};
+
+const onCancel = () => {
+  emits("cancel");
+};
+</script>
+
+<template>
+  <v-row>
+    <!-- Duyệt qua danh sách fields để render input -->
+    <v-col cols="12" md="6" v-for="field in fields" :key="field.name">
+      <MTextField
+        v-model="formData[field.name]"
+        :type="field.type"
+        :label="field.label"
+        :placeholder="field.placeholder || ''"
+      />
+    </v-col>
+    <v-col cols="12" md="6">
+      <v-btn @click="onUpdate">Update</v-btn>
+      <v-btn @click="onCancel" color="red">Cancel</v-btn>
+    </v-col>
+  </v-row>
+</template>
+
+```
+```
+<template>
+  <v-container>
+    <v-data-table :items="users" :headers="headers">
+      <template #item.actions="{ item }">
+        <v-btn @click="openUpdateForm(item.id)">Update</v-btn>
+      </template>
+    </v-data-table>
+
+    <UpdateForm
+      v-if="showUpdateForm"
+      :id="selectedId"
+      :fields="fields"
+      @update="handleUpdate"
+      @cancel="closeUpdateForm"
+      @delete="handleDelete"
+    />
+  </v-container>
+</template>
+
+<script setup lang="ts">
+import { ref } from "vue";
+import UpdateForm from "@/components/UpdateForm.vue";
+
+const users = ref([
+  { id: "1", firstName: "John", lastName: "Doe", email: "john@example.com", address: "123 Street" },
+  { id: "2", firstName: "Jane", lastName: "Smith", email: "jane@example.com", address: "456 Avenue" },
+]);
+
+const headers = [
+  { text: "First Name", value: "firstName" },
+  { text: "Last Name", value: "lastName" },
+  { text: "Email", value: "email" },
+  { text: "Actions", value: "actions", sortable: false },
+];
+
+const fields = [
+  { name: "firstName", label: "First Name", type: "text", placeholder: "Enter First Name" },
+  { name: "lastName", label: "Last Name", type: "text", placeholder: "Enter Last Name" },
+  { name: "email", label: "Email", type: "email", placeholder: "Enter Email" },
+  { name: "address", label: "Address", type: "text", placeholder: "Enter Address" },
+];
+
+const showUpdateForm = ref(false);
+const selectedId = ref("");
+
+const openUpdateForm = (id: string) => {
+  selectedId.value = id;
+  showUpdateForm.value = true;
+};
+
+const closeUpdateForm = () => {
+  showUpdateForm.value = false;
+};
+
+const handleUpdate = (updatedData: Record<string, any>) => {
+  console.log("Updated Data:", updatedData);
+  closeUpdateForm();
+};
+
+const handleDelete = () => {
+  console.log("Record deleted");
+  closeUpdateForm();
+};
+</script>
+
+```
+```
+<script setup lang="ts">
+import { inject, ref, reactive, onMounted } from "vue";
+import { Key } from "@/consts";
+import Editor from "@/components/molecules/Editor/index.vue";
+
+interface Field {
+  name: string;
+  label: string;
+  type: string;
+  placeholder?: string;
+}
+
+interface Props {
+  id: string; // ID được truyền vào khi click update
+  fields: Field[];
+}
+
+const $app = inject(Key);
+if (!$app) throw new Error("No app provided");
+
+const emits = defineEmits<{
+  (e: "update", data: Record<string, any>): void;
+  (e: "cancel"): void;
+  (e: "delete"): void;
+}>();
+
+const props = defineProps<Props>();
+const loading = ref(false);
+const formData = reactive<Record<string, any>>({}); // Trạng thái form động
+
+const loadData = async () => {
+  try {
+    loading.value = true;
+
+    // Gọi API để lấy dữ liệu dựa trên ID
+    const response = await $app.$api.get(`/api/v1/user/${props.id}`);
+    Object.assign(formData, response.data); // Gán dữ liệu từ API vào formData
+  } catch (error) {
+    console.error("Failed to load data:", error);
+  } finally {
+    loading.value = false;
+  }
+};
+
+const onUpdated = async () => {
+  emits("update", formData); // Emit dữ liệu khi nhấn update
+};
+
+const onDeletedClicked = async () => {
+  emits("delete");
+};
+
+const onCanceled = () => {
+  emits("cancel");
+};
+
+onMounted(async () => {
+  await loadData(); // Load dữ liệu khi component được mount
+});
+</script>
+
+<template>
+  <Editor :loading="loading" @update="onUpdated" @cancel="onCanceled" @delete="onDeletedClicked">
+    <v-row>
+      <!-- Form động dựa trên danh sách fields -->
+      <v-col cols="12" md="6" v-for="field in props.fields" :key="field.name">
+        <MTextField
+          v-model="formData[field.name]"
+          :type="field.type"
+          :label="field.label"
+          :placeholder="field.placeholder || ''"
+        />
+      </v-col>
+    </v-row>
+  </Editor>
+</template>
+
+```
+----------------------------------updatae --------------------------------
+```
 <template>
   <RegistForm :fields="fields" @regist="handleRegist" />
 </template>
